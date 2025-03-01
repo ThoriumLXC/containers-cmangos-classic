@@ -1,0 +1,63 @@
+"""
+Rules, Debian & Docker Dependencies
+"""
+
+bazel_dep(name = "rules_distroless", version = "0.4.2")
+bazel_dep(name = "rules_oci", version = "2.0.0")
+bazel_dep(name = "container_structure_test", version = "1.16.0")
+bazel_dep(name = "aspect_bazel_lib", version = "2.10.0")
+bazel_dep(name = "rules_pkg", version = "1.0.1")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+
+# ===========================
+apt = use_extension(
+    "@rules_distroless//apt:extensions.bzl",
+    "apt",
+)
+
+# ====
+apt.install(
+    name = "image_builddeps",
+    lock = "@@//containers/builddeps:packages.lock.json",
+    manifest = "//containers/builddeps:packages.yaml",
+)
+apt.install(
+    name = "image_runtime",
+    lock = "@@//containers/runtime:packages.lock.json",
+    manifest = "//containers/runtime:packages.yaml",
+)
+
+# ====
+use_repo(
+    apt,
+    "image_builddeps",
+    "image_runtime",
+)
+# ===========================
+
+# ===========================
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+oci.pull(
+    name = "ubuntu_2404",
+    digest = "sha256:80dd3c3b9c6cecb9f1667e9290b3bc61b78c2678c02cbdae5f0fea92cc6734ab",  # 24.04
+    image = "docker.io/library/ubuntu",
+    platforms = [
+        "linux/amd64",
+    ],
+)
+oci.pull(
+    name = "mariadb",
+    digest = "sha256:a3c3ecdba222d33017b1128ae2a5930a3d6b8b21cd6d5e534886e75a523612ee",  # 11.4
+    image = "docker.io/library/mariadb",
+    platforms = [
+        "linux/amd64",
+    ],
+)
+use_repo(
+    oci,
+    "mariadb",
+    "mariadb_linux_amd64",
+    "ubuntu_2404",
+    "ubuntu_2404_linux_amd64",
+)
+# ===========================

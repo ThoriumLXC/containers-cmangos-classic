@@ -1,0 +1,88 @@
+load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
+load("@aspect_bazel_lib//lib:tar.bzl", "mtree_mutate", "mtree_spec", "tar")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("//:bazel/common.bzl", "BUILD_DIRECTORY", "IMAGE_LABELS", "REPO_NAME")
+load("//:bazel/docker.bzl", "docker_load")
+load("//:bazel/registries.bzl", "REPOSITORIES")
+load("//:third_party/cmangos.bzl", "SOURCE_REF_LABELS")
+
+ROOTFS_SRCS = glob([
+    "rootfs/*",
+    "rootfs/**/*",
+])
+
+mtree_spec(
+    name = "rootfs",
+    srcs = ROOTFS_SRCS,
+)
+
+mtree_mutate(
+    name = "rootfs_mutate",
+    mtree = ":rootfs",
+    owner = "mangos",
+    strip_prefix = "containers/builder/rootfs",
+)
+
+tar(
+    name = "rootfs_layer",
+    srcs = ROOTFS_SRCS,
+    mtree = "rootfs_mutate",
+)
+
+oci_image(
+    name = "image",
+    base = "//containers/builddeps:image",
+    entrypoint = [
+        "bash",
+        "/opt/run/build.sh",
+    ],
+    env = {
+        "SOURCE_DIR": "/source/mangos-classic",
+        "BUILD_DIR": BUILD_DIRECTORY,
+        "SOURCE_DATE_EPOCH": "0",
+    },
+    labels = {
+        "org.opencontainers.image.title": "CMaNGOS Classic Builder",
+        "org.opencontainers.image.description": "A builder image responsible for creating builds of CMaNGOS Classic.",
+    } | IMAGE_LABELS | SOURCE_REF_LABELS,
+    tars = [
+        "@cmangos_mangos_classic//:source",
+        "@cmangos_classic_playerbots//:source",
+        "@cmangos_classic_db//:source",
+        ":rootfs_layer",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["{n}-builder:wip".format(n = REPO_NAME)],
+)
+
+docker_load(
+    name = "docker_run_image",
+    image = ":load",
+    tags = ":_load_write_tags",
+    visibility = ["//visibility:public"],
+)
+
+expand_template(
+    name = "stamped",
+    out = "_stamped.tags.txt",
+    stamp_substitutions = {"0.0.0": "{{STABLE_CALVER}}"},
+    template = ["0.0.0"],
+)
+
+[
+    oci_push(
+        name = "push_{a}".format(a = alias),
+        image = ":image",
+        remote_tags = ":stamped",
+        repository = "{r}/{n}-builder".format(
+            n = REPO_NAME,
+            r = repository,
+        ),
+    )
+    for alias, repository in REPOSITORIES.items()
+]

@@ -1,0 +1,51 @@
+load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("//:bazel/common.bzl", "BUILD_DIRECTORY", "IMAGE_LABELS", "REPO_NAME")
+load("//:bazel/registries.bzl", "REPOSITORIES")
+load("//:third_party/cmangos.bzl", "SOURCE_REF_LABELS")
+
+oci_image(
+    name = "image",
+    base = "//containers/runtime:image",
+    cmd = [
+        "bash",
+        "ExtractResources.sh",
+        "a",
+        "/client",
+        "/output",
+    ],
+    labels = {
+        "org.opencontainers.image.title": "CMaNGOS Classic Extractor",
+        "org.opencontainers.image.description": "A CMaNGOS Classic container image ready-to-use for client-data extraction.",
+    } | IMAGE_LABELS | SOURCE_REF_LABELS,
+    tars = [
+        "//containers:build_default_layer",
+    ],
+    workdir = "{d}/bin/tools".format(d = BUILD_DIRECTORY),
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["{n}-extractor:wip".format(n = REPO_NAME)],
+)
+
+expand_template(
+    name = "stamped",
+    out = "_stamped.tags.txt",
+    stamp_substitutions = {"0.0.0": "{{STABLE_CALVER}}"},
+    template = ["extractor-0.0.0"],
+)
+
+[
+    oci_push(
+        name = "push_{a}".format(a = alias),
+        image = ":image",
+        remote_tags = ":stamped",
+        repository = "{r}/{n}".format(
+            n = REPO_NAME,
+            r = repository,
+        ),
+    )
+    for alias, repository in REPOSITORIES.items()
+]

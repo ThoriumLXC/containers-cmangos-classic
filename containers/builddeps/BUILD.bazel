@@ -1,0 +1,51 @@
+load("@rules_distroless//distroless:defs.bzl", "flatten")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("//:bazel/common.bzl", "IMAGE_LABELS", "REPO_NAME")
+load("//:bazel/registries.bzl", "REPOSITORIES")
+
+flatten(
+    name = "packages",
+    deduplicate = True,
+    tars = [
+        "@image_builddeps//:packages",
+    ],
+)
+
+oci_image(
+    name = "image",
+    base = "@ubuntu_2404_linux_amd64",
+    labels = {
+        "org.opencontainers.image.title": "CMaNGOS Classic BuildDeps",
+        "org.opencontainers.image.description": "A CMaNGOS Classic build dependencies image to support building the emulator within docker.",
+    } | IMAGE_LABELS,
+    tars = [
+        ":packages",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "digest",
+    srcs = [":image.digest"],
+    outs = ["digest.image.txt"],
+    cmd = "cp $(location :image.digest) $@",
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["{n}-builddeps:wip".format(n = REPO_NAME)],
+)
+
+[
+    oci_push(
+        name = "push_{a}".format(a = alias),
+        image = ":image",
+        remote_tags = ":digest",
+        repository = "{r}/{n}-builddeps".format(
+            n = REPO_NAME,
+            r = repository,
+        ),
+    )
+    for alias, repository in REPOSITORIES.items()
+]

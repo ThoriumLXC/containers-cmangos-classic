@@ -1,0 +1,37 @@
+# Packages for the builder image
+#
+#  Anytime this file is changed, the lockfile needs to be regenerated.
+#
+#  To generate the packages.lock.json run the following command
+#
+#     bazel run @image_builddeps//:lock
+#
+version: 1
+
+sources:
+  - channel: noble main universe
+    url: https://snapshot.ubuntu.com/ubuntu/20250201T030400Z
+  - channel: noble-security main universe
+    url: https://snapshot.ubuntu.com/ubuntu/20250201T030400Z
+  - channel: noble-updates main universe
+    url: https://snapshot.ubuntu.com/ubuntu/20250201T030400Z
+
+packages:
+  - build-essential
+  - bzip2
+  - ca-certificates
+  - cmake
+  - g++-14
+  - git
+  - libboost-filesystem-dev
+  - libboost-program-options-dev
+  - libboost-regex-dev
+  - libboost-serialization-dev
+  - libboost-system-dev
+  - libboost-thread-dev
+  - libmariadb-dev-compat
+  - libssl-dev
+  - mariadb-client
+
+archs:
+  - amd64

@@ -1,0 +1,25 @@
+# Packages for the builder image
+#
+#  Anytime this file is changed, the lockfile needs to be regenerated.
+#
+#  To generate the packages.lock.json run the following command
+#
+#     bazel run @image_runtime//:lock
+#
+version: 1
+
+sources:
+  - channel: noble main universe
+    url: https://snapshot.ubuntu.com/ubuntu/20250201T030400Z
+  - channel: noble-security main universe
+    url: https://snapshot.ubuntu.com/ubuntu/20250201T030400Z
+  - channel: noble-updates main universe
+    url: https://snapshot.ubuntu.com/ubuntu/20250201T030400Z
+
+packages:
+  - libmariadb-dev
+  - libmysqlclient
+  - openssl
+
+archs:
+  - amd64

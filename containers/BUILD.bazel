@@ -1,0 +1,49 @@
+load("@aspect_bazel_lib//lib:tar.bzl", "mtree_mutate", "tar")
+load("//:bazel/common.bzl", "BUILD_DIRECTORY", "STANDARD_USER")
+load("//:bazel/docker.bzl", "docker_run_and_extract", "remove_leading_slash")
+load("//containers:variants.bzl", "VARIANTS")
+
+[
+    docker_run_and_extract(
+        name = "build_{n}".format(n = variant["name"]),
+        src = "//containers/builder:docker_run_image",
+        command = [
+            "bash",
+            "/opt/run/build.sh",
+            variant["arguments"],
+        ],
+        env = {
+            "BUILD_THREADS": "8",
+        },
+        out_dir = BUILD_DIRECTORY,
+    )
+    for variant in VARIANTS
+]
+
+filegroup(
+    name = "build",
+    srcs = [
+        ":build_{n}".format(n = variant["name"])
+        for variant in VARIANTS
+    ],
+)
+
+[
+    mtree_mutate(
+        name = "build_{n}_outputs".format(n = variant["name"]),
+        mtree = ":build_{n}.mtree".format(n = variant["name"]),
+        package_dir = remove_leading_slash(BUILD_DIRECTORY),
+        ownername = STANDARD_USER,
+    )
+    for variant in VARIANTS
+]
+
+[
+    tar(
+        name = "build_{n}_layer".format(n = variant["name"]),
+        srcs = [":build_{n}".format(n = variant["name"])],
+        mtree = ":build_{n}_outputs.mtree".format(n = variant["name"]),
+        visibility = ["//visibility:public"],
+    )
+    for variant in VARIANTS
+]

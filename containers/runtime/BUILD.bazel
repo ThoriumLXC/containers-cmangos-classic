@@ -1,0 +1,103 @@
+load("@rules_distroless//distroless:defs.bzl", "flatten", "group", "passwd")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("//:bazel/common.bzl", "IMAGE_LABELS", "REPO_NAME", "STANDARD_USER", "STANDARD_USER_GID", "STANDARD_USER_ID")
+load("//:bazel/registries.bzl", "REPOSITORIES")
+
+passwd(
+    name = "passwd",
+    entries = [
+        {
+            "uid": 0,
+            "gid": 0,
+            "home": "/root",
+            "shell": "/bin/bash",
+            "username": "root",
+        },
+        {
+            "uid": 100,
+            "gid": 65534,
+            "home": "/home/_apt",
+            "shell": "/usr/sbin/nologin",
+            "username": "_apt",
+        },
+        {
+            "uid": STANDARD_USER_ID,
+            "gid": STANDARD_USER_GID,
+            "home": "/home/{n}".format(n = STANDARD_USER),
+            "shell": "/bin/bash",
+            "username": STANDARD_USER,
+        },
+    ],
+)
+
+group(
+    name = "group",
+    entries = [
+        {
+            "name": "root",
+            "gid": 0,
+        },
+        {
+            "name": "_apt",
+            "gid": 65534,
+        },
+        {
+            "name": STANDARD_USER,
+            "gid": STANDARD_USER_GID,
+        },
+    ],
+)
+
+flatten(
+    name = "packages",
+    deduplicate = True,
+    tars = [
+        "@image_runtime//:packages",
+    ],
+)
+
+oci_image(
+    name = "image",
+    base = "@ubuntu_2404_linux_amd64",
+    env = {
+        "PATH": "${PATH}:/opt/mangos/bin",
+    },
+    labels = {
+        "org.opencontainers.image.title": "CMaNGOS Classic Runtime",
+        "org.opencontainers.image.description": "A CMaNGOS Classic runtime image with essential runtime dependencies.",
+    } | IMAGE_LABELS,
+    tars = [
+        ":packages",
+        ":passwd",
+        ":group",
+    ],
+    user = "mangos:mangos",
+    visibility = ["//visibility:public"],
+    workdir = "/opt/mangos",
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["{n}-runtime:wip".format(n = REPO_NAME)],
+)
+
+genrule(
+    name = "digest",
+    srcs = [":image.digest"],
+    outs = ["digest.image.txt"],
+    cmd = "cp $(location :image.digest) $@",
+)
+
+[
+    oci_push(
+        name = "push_{a}".format(a = alias),
+        image = ":image",
+        remote_tags = ":digest",
+        repository = "{r}/{n}-runtime".format(
+            n = REPO_NAME,
+            r = repository,
+        ),
+    )
+    for alias, repository in REPOSITORIES.items()
+]

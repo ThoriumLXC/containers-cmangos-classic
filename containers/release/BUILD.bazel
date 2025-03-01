@@ -1,0 +1,63 @@
+load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("//:bazel/common.bzl", "BUILD_DIRECTORY", "IMAGE_LABELS", "REPO_NAME")
+load("//:bazel/registries.bzl", "REPOSITORIES")
+load("//:third_party/cmangos.bzl", "SOURCE_REF_LABELS")
+load("//containers:variants.bzl", "VARIANTS")
+
+[
+    oci_image(
+        name = "image_{n}".format(n = variant["name"]),
+        base = "//containers/runtime:image",
+        labels = {
+            "org.opencontainers.image.title": "CMaNGOS Classic",
+            "org.opencontainers.image.description": "A CMaNGOS Classic container image ready-to-use.",
+        } | IMAGE_LABELS | SOURCE_REF_LABELS,
+        tars = [
+            "//containers:build_{n}_layer".format(n = variant["name"]),
+        ],
+        workdir = "{d}/bin".format(d = BUILD_DIRECTORY),
+    )
+    for variant in VARIANTS
+]
+
+[
+    oci_load(
+        name = "load_{n}".format(n = variant["name"]),
+        image = ":image_{n}".format(n = variant["name"]),
+        repo_tags = [
+            "{r}:{n}".format(
+                n = variant["name"],
+                r = REPO_NAME,
+            ),
+        ],
+    )
+    for variant in VARIANTS
+]
+
+[
+    expand_template(
+        name = "stamped_{v}".format(v = variant["name"]),
+        out = "_stamped_{v}.tags.txt".format(v = variant["name"]),
+        stamp_substitutions = {"0.0.0": "{{STABLE_CALVER}}"},
+        template = ["{v}-0.0.0".format(v = variant["name"])],
+    )
+    for variant in VARIANTS
+]
+
+[
+    oci_push(
+        name = "push_{v}_{a}".format(
+            a = alias,
+            v = variant["name"],
+        ),
+        image = ":image_{v}".format(v = variant["name"]),
+        remote_tags = ":stamped_{v}".format(v = variant["name"]),
+        repository = "{r}/{n}".format(
+            n = REPO_NAME,
+            r = repository,
+        ),
+    )
+    for variant in VARIANTS
+    for alias, repository in REPOSITORIES.items()
+]
