@@ -19,7 +19,6 @@ mtree_spec(
 mtree_mutate(
     name = "rootfs_mutate",
     mtree = ":rootfs",
-    owner = "mangos",
     strip_prefix = "containers/builder/rootfs",
 )
 

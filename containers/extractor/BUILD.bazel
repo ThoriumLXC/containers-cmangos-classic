@@ -1,8 +1,32 @@
 load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
+load("@aspect_bazel_lib//lib:tar.bzl", "mtree_mutate", "mtree_spec", "tar")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
-load("//:bazel/common.bzl", "BUILD_DIRECTORY", "IMAGE_LABELS", "REPO_NAME")
+load("//:bazel/common.bzl", "BUILD_DIRECTORY", "IMAGE_LABELS", "REPO_NAME", "STANDARD_USER_ID")
 load("//:bazel/registries.bzl", "REPOSITORIES")
 load("//:third_party/cmangos.bzl", "SOURCE_REF_LABELS")
+
+ROOTFS_SRCS = glob([
+    "rootfs/*",
+    "rootfs/**/*",
+])
+
+mtree_spec(
+    name = "rootfs",
+    srcs = ROOTFS_SRCS,
+)
+
+mtree_mutate(
+    name = "rootfs_mutate",
+    mtree = ":rootfs",
+    owner = STANDARD_USER_ID,
+    strip_prefix = "containers/extractor/rootfs",
+)
+
+tar(
+    name = "rootfs_layer",
+    srcs = ROOTFS_SRCS,
+    mtree = "rootfs_mutate",
+)
 
 oci_image(
     name = "image",
@@ -20,6 +44,7 @@ oci_image(
     } | IMAGE_LABELS | SOURCE_REF_LABELS,
     tars = [
         "//containers:build_default_layer",
+        ":rootfs_layer",
     ],
     workdir = "{d}/bin/tools".format(d = BUILD_DIRECTORY),
 )

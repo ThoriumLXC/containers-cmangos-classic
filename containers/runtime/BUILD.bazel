@@ -33,18 +33,21 @@ passwd(
 group(
     name = "group",
     entries = [
-        {
-            "name": "root",
-            "gid": 0,
-        },
-        {
-            "name": "_apt",
-            "gid": 65534,
-        },
-        {
-            "name": STANDARD_USER,
-            "gid": STANDARD_USER_GID,
-        },
+        dict(
+            name = "root",
+            gid = 0,
+        ),
+        dict(
+            name = "_apt",
+            gid = 65534,
+        ),
+        dict(
+            name = STANDARD_USER,
+            gid = STANDARD_USER_GID,
+            users = [
+                STANDARD_USER,
+            ],
+        ),
     ],
 )
 
